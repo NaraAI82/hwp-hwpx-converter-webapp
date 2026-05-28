@@ -1,6 +1,8 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.git/
-.DS_Store
+*
+!app.py
+!requirements.txt
+!Dockerfile
+!templates/
+!templates/index.html
+!static/
+!static/style.css
