@@ -3,6 +3,9 @@ from __future__ import annotations
 import io
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import zlib
 import zipfile
 import xml.etree.ElementTree as ET
@@ -250,14 +253,53 @@ def quality_check(text: str) -> bool:
 
 def failure_notice_files(stem: str) -> List[Tuple[str, bytes]]:
     txt = HWP_FALLBACK_NOTICE
-    md = HWP_FALLBACK_NOTICE
+    md = f"# HWP 지원 제한 안내\n\n{HWP_FALLBACK_NOTICE}"
     return [
         (f"{stem}.txt", txt.encode("utf-8")),
         (f"{stem}.md", md.encode("utf-8")),
     ]
 
 
+def _hwp5txt_extract(data: bytes) -> str:
+    hwp5txt_path = shutil.which("hwp5txt")
+    if not hwp5txt_path:
+        return ""
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".hwp", delete=False) as tmp:
+            tmp.write(data)
+            temp_path = tmp.name
+
+        result = subprocess.run(
+            [hwp5txt_path, temp_path],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            timeout=8,
+        )
+        if result.returncode != 0:
+            return ""
+        return normalize_text(result.stdout or "")
+    except Exception:
+        return ""
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+
 def hwp_to_text(data: bytes) -> Tuple[str, str]:
+    # 1) Try hwp5txt (pyhwp ecosystem) if available in runtime.
+    extracted = _hwp5txt_extract(data)
+    if extracted and quality_check(extracted):
+        return extracted, f"# HWP 변환 결과\n\n{extracted}"
+
+    # 2) Fallback to internal olefile parser.
     text_chunks: List[str] = []
 
     try:

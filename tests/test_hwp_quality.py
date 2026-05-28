@@ -35,7 +35,8 @@ def run() -> None:
     md = zf.read("broken.md").decode("utf-8")
 
     assert txt == HWP_FALLBACK_NOTICE
-    assert md == HWP_FALLBACK_NOTICE
+    assert md.startswith("# HWP 지원 제한 안내")
+    assert HWP_FALLBACK_NOTICE in md
 
     forbidden = ["Root Entry", "BodyText", "DocInfo", "FileHeader"]
     for token in forbidden:
