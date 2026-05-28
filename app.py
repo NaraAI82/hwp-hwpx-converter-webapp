@@ -18,6 +18,7 @@ app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
 HWP_FALLBACK_NOTICE = (
     "HWP 바이너리 파일은 구조상 정확한 텍스트 추출이 어려울 수 있습니다.\n"
+    "현재 파일은 깨진 바이너리 문자열이 감지되어 변환 결과를 제공하지 않았습니다.\n"
     "가능하면 한글 프로그램에서 ‘다른 이름으로 저장 → HWPX’로 변환한 뒤 다시 업로드해 주세요."
 )
 
@@ -25,9 +26,16 @@ SUSPICIOUS_MARKERS = {
     "root entry",
     "bodytext",
     "docinfo",
-    "scripts",
     "fileheader",
-    "bindata",
+    "scripts",
+    "defaultjscript",
+    "hwpsummaryinformation",
+    "linkdoc",
+    "ole",
+    "ole10native",
+    "prvtext",
+    "prvimage",
+    "section",
 }
 
 
@@ -165,7 +173,6 @@ def _extract_para_text_from_section(section: bytes) -> str:
         if tag_id == 67 and payload:
             try:
                 t = payload.decode("utf-16le", errors="ignore")
-                t = t.replace("\x00", " ")
                 if t.strip():
                     out.append(t)
             except Exception:
@@ -174,34 +181,68 @@ def _extract_para_text_from_section(section: bytes) -> str:
     return normalize_text("\n".join(out))
 
 
-def text_quality_ok(text: str) -> bool:
+def quality_check(text: str) -> bool:
     t = (text or "").strip()
     if len(t) < 20:
         return False
 
     lowered = t.lower()
-    marker_hits = sum(lowered.count(m) for m in SUSPICIOUS_MARKERS)
+    hard_fail_markers = {"root entry", "docinfo", "fileheader", "bodytext"}
+    if any(m in lowered for m in hard_fail_markers):
+        return False
+
+    if "\x00" in t:
+        return False
+
+    marker_hits = sum(1 for m in SUSPICIOUS_MARKERS if m in lowered)
     if marker_hits >= 2:
         return False
 
     allowed_chars = re.findall(r"[가-힣A-Za-z0-9\s\.,;:!?\-\(\)\[\]\{\}\"'“”‘’·…/]", t)
     allowed_ratio = len(allowed_chars) / max(len(t), 1)
+    disallowed_ratio = 1 - allowed_ratio
 
     control_chars = sum(1 for c in t if ord(c) < 32 and c not in "\n\t\r")
     control_ratio = control_chars / max(len(t), 1)
 
     replacement_ratio = t.count("�") / max(len(t), 1)
+    garbled_symbol_ratio = len(re.findall(r"[�◻◼◆◇□■※¤�]", t)) / max(len(t), 1)
 
     meaningful = re.findall(r"[가-힣A-Za-z0-9]", t)
     meaningful_ratio = len(meaningful) / max(len(t), 1)
+    hangul_ratio = len(re.findall(r"[가-힣]", t)) / max(len(t), 1)
 
-    if allowed_ratio < 0.72:
+    punct_count = len(re.findall(r"[.!?;:,]", t))
+    if len(t) >= 200 and punct_count <= 1:
         return False
-    if meaningful_ratio < 0.28:
+
+    random_runs = re.findall(r"[A-Za-z0-9_\-+=/\\|]{18,}", t)
+    if len(random_runs) >= 2:
+        return False
+
+    lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
+    normal_lines = 0
+    for ln in lines:
+        if len(ln) < 8:
+            continue
+        if re.search(r"[가-힣]{2,}", ln) and re.search(r"[A-Za-z가-힣0-9]", ln):
+            normal_lines += 1
+
+    if normal_lines < 3:
+        return False
+    if allowed_ratio < 0.70:
+        return False
+    if disallowed_ratio >= 0.30:
+        return False
+    if meaningful_ratio < 0.25:
+        return False
+    if hangul_ratio < 0.10:
         return False
     if control_ratio > 0.01:
         return False
     if replacement_ratio > 0.01:
+        return False
+    if garbled_symbol_ratio > 0.02:
         return False
 
     return True
@@ -209,7 +250,7 @@ def text_quality_ok(text: str) -> bool:
 
 def failure_notice_files(stem: str) -> List[Tuple[str, bytes]]:
     txt = HWP_FALLBACK_NOTICE
-    md = f"# 변환 안내\n\n{HWP_FALLBACK_NOTICE}"
+    md = HWP_FALLBACK_NOTICE
     return [
         (f"{stem}.txt", txt.encode("utf-8")),
         (f"{stem}.md", md.encode("utf-8")),
@@ -238,7 +279,7 @@ def hwp_to_text(data: bytes) -> Tuple[str, str]:
         return "", ""
 
     merged = normalize_text("\n\n".join(text_chunks))
-    if not text_quality_ok(merged):
+    if not quality_check(merged):
         return "", ""
 
     md = f"# HWP 변환 결과\n\n{merged}"

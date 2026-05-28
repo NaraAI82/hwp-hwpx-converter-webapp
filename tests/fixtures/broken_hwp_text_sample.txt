@@ -1,0 +1,15 @@
+Root Entry
+BodyText
+DocInfo
+FileHeader
+Scripts
+DefaultJScript
+HwpSummaryInformation
+LinkDoc
+Ole
+Ole10Native
+PrvText
+PrvImage
+Section0
+A9f_0KLMNZZZ___+++==//\\||ABCD1234EFGH5678IJKL
+\x00\x00\x00 garbled ### $$$ %%%
