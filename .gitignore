@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+._*
+
+# Local env
+.venv/
+
+# Large source archives in this workspace
+hwp_xlsx/
+img/
+txt_pdf_docx/
+*.pdf
+*.docx
+*.jpg
+*.jpeg
+*.png
+*.heic
+
+# Keep app deploy files tracked explicitly
+!README.md
+!README_converter.md
+!app.py
+!requirements.txt
+!Dockerfile
+!render.yaml
+!.dockerignore
+!vercel.json
+!fly.toml
+!templates/
+!templates/index.html
+!static/
+!static/style.css
+!api/
+!api/index.py

@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: hwp-hwpx-converter
+    env: docker
+    plan: free
+    autoDeploy: true

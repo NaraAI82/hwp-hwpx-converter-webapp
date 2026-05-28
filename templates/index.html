@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HWP/HWPX 변환기</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>HWP/HWPX → TXT/MD 변환기</h1>
+      <p class="sub">링크만 열어서 파일 업로드 후 즉시 변환/다운로드 가능합니다.</p>
+
+      {% if error %}
+      <div class="alert">{{ error }}</div>
+      {% endif %}
+
+      <form id="uploadForm" action="/convert" method="post" enctype="multipart/form-data">
+        <label for="fileInput" id="dropzone" class="dropzone" tabindex="0">
+          <strong>파일을 끌어놓거나 클릭해서 선택</strong>
+          <span>.hwp, .hwpx 여러 개 업로드 가능</span>
+          <input id="fileInput" name="files" type="file" accept=".hwp,.hwpx" multiple required>
+        </label>
+
+        <ul id="fileList" class="file-list"></ul>
+
+        <button id="submitBtn" type="submit">변환하고 ZIP 다운로드</button>
+      </form>
+
+      <p class="note">HWPX는 안정적으로 추출됩니다. HWP는 파일 구조상 일부 서식이 깨질 수 있습니다.</p>
+    </section>
+  </main>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+
+    function renderFileList(files) {
+      fileList.innerHTML = '';
+      [...files].forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = file.name;
+        fileList.appendChild(li);
+      });
+    }
+
+    fileInput.addEventListener('change', () => {
+      renderFileList(fileInput.files);
+    });
+
+    ['dragenter', 'dragover'].forEach(evt => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('drag');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evt => {
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('drag');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files) return;
+      fileInput.files = dt.files;
+      renderFileList(fileInput.files);
+    });
+
+    dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+  </script>
+</body>
+</html>
